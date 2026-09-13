@@ -9,12 +9,197 @@
 - [1.3. Fitted Q-Learning & Deep Q-Networks (DQN)](#13-fitted-q-learning--deep-q-networks-dqn)
 - [1.4. Métodos de Gradiente de Política e Actor-Critic](#14-métodos-de-gradiente-de-política-e-actor-critic)
 
-### 2. Exemplos de Código Prático
+- [1.5. Double DQN](#15-double-dqn)
+- [1.6. Dueling Network Architecture](#16-dueling-network-architecture)
+- [1.7. Distributional DQN](#17-distributional-dqn)
+- [1.8. Multi-step Learning](#18-multi-step-learning)
+- [1.9. Combinação das melhorias e variantes do DQN](#19-combinacao-das-melhorias-e-variantes-do-dqn)
+
+#### 1.5. Double DQN
+
+O **Double DQN** é uma melhoria do DQN tradicional que reduz o problema da **superestimação dos valores Q**. No DQN convencional, a mesma rede utilizada para escolher a melhor ação também é usada para avaliar essa ação:
+
+```text
+maxₐ' Q(s', a'; θ_target)
+```
+
+Esse procedimento pode favorecer valores excessivamente altos, principalmente quando as estimativas da rede ainda são imprecisas.
+
+No Double DQN, a seleção da melhor ação é feita pela **rede principal**, enquanto a avaliação dessa ação é feita pela **rede alvo**:
+
+```text
+a* = argmaxₐ' Q(s', a'; θ)
+Y = r + γ Q(s', a*; θ_target)
+```
+
+Assim, as duas redes desempenham funções diferentes:
+
+- **Rede principal (`θ`)** — escolhe qual ação parece ser a melhor.
+- **Rede alvo (`θ_target`)** — estima o valor da ação escolhida.
+
+Essa separação reduz a tendência de superestimar as recompensas futuras e pode tornar o treinamento mais estável.
+
+**Quando usar:** quando o DQN apresenta valores Q exageradamente altos, instabilidade ou dificuldade para distinguir ações de qualidade semelhante.
+
+**Quando não usar:** em ambientes muito simples, nos quais o DQN tradicional já apresenta desempenho satisfatório e a complexidade adicional não traz benefício significativo.
+
+[💻 Ver exemplo de código de Double DQN](#código-5-double-dqn)
+
+---
+
+## 1.6. Dueling Network Architecture
+
+A **Dueling Network Architecture** modifica a estrutura interna da rede neural do DQN. Em vez de produzir diretamente um Q-value para cada ação, a rede é dividida em dois fluxos:
+
+1. **Value stream** — estima o valor geral do estado `V(s)`, independentemente da ação.
+2. **Advantage stream** — estima a vantagem de cada ação `A(s, a)` em relação às outras ações disponíveis.
+
+Esses dois fluxos são combinados para produzir os valores Q:
+
+```text
+Q(s, a) = V(s) + A(s, a)
+```
+
+Na prática, é comum utilizar uma normalização da vantagem para evitar ambiguidades entre `V(s)` e `A(s, a)`:
+
+```text
+Q(s, a) = V(s) + A(s, a) - meanₐ'[A(s, a')]
+```
+
+A principal vantagem dessa arquitetura é que ela consegue aprender **quão bom é um estado** mesmo quando várias ações possuem efeitos semelhantes. Isso pode ser útil em situações nas quais a escolha exata da ação não é tão importante.
+
+**Quando usar:** em ambientes com muitas ações semelhantes ou nos quais é importante identificar rapidamente se um estado é bom ou ruim.
+
+**Quando não usar:** quando a rede já é muito pequena ou quando a divisão em dois fluxos aumenta a complexidade sem produzir melhorias mensuráveis.
+
+[💻 Ver exemplo de código de Dueling DQN](#código-6-dueling-dqn)
+
+---
+
+## 1.7. Distributional DQN
+
+O **Distributional DQN** não estima apenas o valor esperado de uma ação. Ele procura aprender a **distribuição completa dos retornos futuros** associados a essa ação.
+
+No DQN tradicional, a rede estima:
+
+```text
+Q(s, a) = E[Z(s, a)]
+```
+
+Nesse caso, `Q(s, a)` representa somente o retorno esperado.
+
+No Distributional DQN, a variável aleatória `Z(s, a)` representa diferentes retornos possíveis. A rede tenta modelar essa distribuição, permitindo representar situações como:
+
+- uma ação com retorno médio alto, mas muito arriscada;
+- uma ação com retorno médio semelhante, porém mais consistente;
+- uma ação com possibilidade de recompensa muito alta ou muito baixa.
+
+A distribuição pode ser representada de diferentes maneiras. Uma abordagem conhecida é o **Categorical DQN (C51)**, que utiliza um conjunto fixo de valores possíveis, chamados de *atoms*, e aprende a probabilidade associada a cada um deles.
+
+Em vez de retornar apenas:
+
+```text
+Q(s, a) = 10
+```
+
+a rede pode representar algo semelhante a:
+
+```text
+Retorno 5  → probabilidade 0,3
+Retorno 10 → probabilidade 0,5
+Retorno 20 → probabilidade 0,2
+```
+
+O objetivo é aprender como os retornos estão distribuídos, e não somente sua média.
+
+**Quando usar:** em ambientes com incerteza elevada, recompensas muito variáveis ou nos quais a distribuição dos resultados fornece informações importantes.
+
+**Quando não usar:** quando o problema é simples e o retorno esperado já é suficiente para escolher boas ações.
+
+[💻 Ver exemplo de código de Distributional DQN (C51)](#código-7-distributional-dqn-c51)
+
+---
+
+## 1.8. Multi-step Learning
+
+O **Multi-step Learning** utiliza informações de várias transições futuras para atualizar o valor de uma ação. O DQN tradicional normalmente utiliza um retorno de um único passo:
+
+```text
+Y₁ = rₜ + γ maxₐ Q(sₜ₊₁, a)
+```
+
+No aprendizado de `n` passos, o alvo considera várias recompensas consecutivas:
+
+```text
+Yₙ = rₜ + γrₜ₊₁ + γ²rₜ₊₂ + ... + γⁿ maxₐ Q(sₜ₊ₙ, a)
+```
+
+Por exemplo, em um método de três passos, o agente considera:
+
+1. a recompensa recebida no instante atual;
+2. a recompensa recebida no passo seguinte;
+3. a recompensa recebida no segundo passo seguinte;
+4. a estimativa futura a partir do terceiro estado.
+
+Essa abordagem faz com que as recompensas sejam propagadas mais rapidamente para as ações que contribuíram para obtê-las. Porém, utilizar muitos passos pode aumentar a variância das atualizações e tornar o aprendizado mais sensível às estimativas incorretas.
+
+**Quando usar:** quando as recompensas são atrasadas e é necessário propagar informações de longo alcance mais rapidamente.
+
+**Quando não usar:** quando o ambiente possui muito ruído ou quando o uso de muitos passos provoca atualizações instáveis.
+
+[💻 Ver exemplo de código de Multi-step Learning](#código-8-multi-step-learning)
+
+---
+
+## 1.9. Combinação das melhorias e variantes do DQN
+
+As melhorias do DQN podem ser combinadas para aproveitar diferentes vantagens. Uma combinação conhecida é o **Rainbow DQN**, que reúne várias técnicas em um único agente.
+
+Entre as principais melhorias utilizadas estão:
+
+- **Double DQN** — reduz a superestimação dos valores Q.
+- **Dueling Network Architecture** — separa o valor do estado da vantagem de cada ação.
+- **Distributional DQN** — aprende a distribuição dos retornos.
+- **Multi-step Learning** — utiliza recompensas de vários passos.
+- **Prioritized Experience Replay** — prioriza experiências consideradas mais relevantes para o aprendizado.
+- **Noisy Networks** — utiliza ruído parametrizado para favorecer a exploração.
+
+A combinação dessas técnicas pode produzir um agente mais eficiente e robusto do que o DQN básico. Entretanto, o treinamento também se torna mais complexo, pois há mais hiperparâmetros, componentes e possibilidades de instabilidade.
+
+### Principais variantes do DQN
+
+Além do DQN original, existem diversas variantes:
+
+| Variante | Principal característica |
+|---|---|
+| **Double DQN** | Reduz a superestimação dos valores Q. |
+| **Dueling DQN** | Separa o valor do estado e a vantagem das ações. |
+| **Distributional DQN** | Aprende a distribuição dos retornos possíveis. |
+| **Multi-step DQN** | Utiliza recompensas acumuladas de vários passos. |
+| **Prioritized Experience Replay** | Amostra com maior frequência experiências mais relevantes. |
+| **Noisy DQN** | Introduz ruído aprendido nos parâmetros para exploração. |
+| **Rainbow DQN** | Combina várias melhorias do DQN em um único agente. |
+
+**Quando usar uma combinação:** quando o ambiente é complexo, possui recompensas atrasadas, elevada incerteza ou exige melhor eficiência de amostragem.
+
+**Quando não usar uma combinação:** durante os primeiros estudos ou em ambientes simples, nos quais é mais adequado começar com DQN básico e adicionar uma melhoria por vez. Dessa forma, fica mais fácil compreender o efeito de cada técnica e identificar a origem de eventuais problemas.
+
+[💻 Ver exemplo de código da combinação das melhorias](#código-9-combinação-das-melhorias--mini-rainbow)
+
+---
+
+# 2. Exemplos de Código Prático
 
 - [💻 Código 1: Simulação com a Propriedade de Markov](#código-1-simulação-com-a-propriedade-de-markov)
 - [💻 Código 2: Algoritmo Q-Learning Tabular](#código-2-algoritmo-q-learning-tabular)
 - [💻 Código 3: Agente Deep Q-Network (DQN)](#código-3-agente-deep-q-network-dqn)
 - [💻 Código 4: Algoritmo REINFORCE (Policy Gradient)](#código-4-algoritmo-reinforce-policy-gradient)
+
+- [💻 Código 5: Double DQN](#código-5-double-dqn)
+- [💻 Código 6: Dueling DQN](#código-6-dueling-dqn)
+- [💻 Código 7: Distributional DQN (C51)](#código-7-distributional-dqn-c51)
+- [💻 Código 8: Multi-step Learning](#código-8-multi-step-learning)
+- [💻 Código 9: Combinação das melhorias — Mini Rainbow](#código-9-combinação-das-melhorias--mini-rainbow)
 
 ---
 
@@ -107,6 +292,169 @@ Quando usar: quando é interessante aprender diretamente a política ou quando o
 Quando não usar: em problemas muito simples e pequenos, nos quais o Q-Learning Tabular pode resolver o problema de forma mais simples.
 
 [💻 Ir direto para o exemplo de Policy Gradient](#código-4-algoritmo-reinforce-policy-gradient)
+
+---
+
+## 1.5. Double DQN
+
+O **Double DQN** é uma melhoria do DQN tradicional que reduz o problema da **superestimação dos valores Q**. No DQN convencional, a mesma rede utilizada para escolher a melhor ação também é usada para avaliar essa ação:
+
+```text
+maxₐ' Q(s', a'; θ_target)
+```
+
+Esse procedimento pode favorecer valores excessivamente altos, principalmente quando as estimativas da rede ainda são imprecisas.
+
+No Double DQN, a seleção da melhor ação é feita pela **rede principal**, enquanto a avaliação dessa ação é feita pela **rede alvo**:
+
+```text
+a* = argmaxₐ' Q(s', a'; θ)
+Y = r + γ Q(s', a*; θ_target)
+```
+
+Assim, as duas redes desempenham funções diferentes:
+
+- **Rede principal (`θ`)** — escolhe qual ação parece ser a melhor.
+- **Rede alvo (`θ_target`)** — estima o valor da ação escolhida.
+
+Essa separação reduz a tendência de superestimar as recompensas futuras e pode tornar o treinamento mais estável.
+
+**Quando usar:** quando o DQN apresenta valores Q exageradamente altos, instabilidade ou dificuldade para distinguir ações de qualidade semelhante.
+
+**Quando não usar:** em ambientes muito simples, nos quais o DQN tradicional já apresenta desempenho satisfatório e a complexidade adicional não traz benefício significativo.
+
+---
+
+## 1.6. Dueling Network Architecture
+
+A **Dueling Network Architecture** modifica a estrutura interna da rede neural do DQN. Em vez de produzir diretamente um Q-value para cada ação, a rede é dividida em dois fluxos:
+
+1. **Value stream** — estima o valor geral do estado `V(s)`, independentemente da ação.
+2. **Advantage stream** — estima a vantagem de cada ação `A(s, a)` em relação às outras ações disponíveis.
+
+Esses dois fluxos são combinados para produzir os valores Q:
+
+```text
+Q(s, a) = V(s) + A(s, a)
+```
+
+Na prática, é comum utilizar uma normalização da vantagem para evitar ambiguidades entre `V(s)` e `A(s, a)`:
+
+```text
+Q(s, a) = V(s) + A(s, a) - meanₐ'[A(s, a')]
+```
+
+A principal vantagem dessa arquitetura é que ela consegue aprender **quão bom é um estado** mesmo quando várias ações possuem efeitos semelhantes. Isso pode ser útil em situações nas quais a escolha exata da ação não é tão importante.
+
+**Quando usar:** em ambientes com muitas ações semelhantes ou nos quais é importante identificar rapidamente se um estado é bom ou ruim.
+
+**Quando não usar:** quando a rede já é muito pequena ou quando a divisão em dois fluxos aumenta a complexidade sem produzir melhorias mensuráveis.
+
+---
+
+## 1.7. Distributional DQN
+
+O **Distributional DQN** não estima apenas o valor esperado de uma ação. Ele procura aprender a **distribuição completa dos retornos futuros** associados a essa ação.
+
+No DQN tradicional, a rede estima:
+
+```text
+Q(s, a) = E[Z(s, a)]
+```
+
+Nesse caso, `Q(s, a)` representa somente o retorno esperado.
+
+No Distributional DQN, a variável aleatória `Z(s, a)` representa diferentes retornos possíveis. A rede tenta modelar essa distribuição, permitindo representar situações como:
+
+- uma ação com retorno médio alto, mas muito arriscada;
+- uma ação com retorno médio semelhante, porém mais consistente;
+- uma ação com possibilidade de recompensa muito alta ou muito baixa.
+
+A distribuição pode ser representada de diferentes maneiras. Uma abordagem conhecida é o **Categorical DQN (C51)**, que utiliza um conjunto fixo de valores possíveis, chamados de *atoms*, e aprende a probabilidade associada a cada um deles.
+
+Em vez de retornar apenas:
+
+```text
+Q(s, a) = 10
+```
+
+a rede pode representar algo semelhante a:
+
+```text
+Retorno 5  → probabilidade 0,3
+Retorno 10 → probabilidade 0,5
+Retorno 20 → probabilidade 0,2
+```
+
+O objetivo é aprender como os retornos estão distribuídos, e não somente sua média.
+
+**Quando usar:** em ambientes com incerteza elevada, recompensas muito variáveis ou nos quais a distribuição dos resultados fornece informações importantes.
+
+**Quando não usar:** quando o problema é simples e o retorno esperado já é suficiente para escolher boas ações.
+
+---
+
+## 1.8. Multi-step Learning
+
+O **Multi-step Learning** utiliza informações de várias transições futuras para atualizar o valor de uma ação. O DQN tradicional normalmente utiliza um retorno de um único passo:
+
+```text
+Y₁ = rₜ + γ maxₐ Q(sₜ₊₁, a)
+```
+
+No aprendizado de `n` passos, o alvo considera várias recompensas consecutivas:
+
+```text
+Yₙ = rₜ + γrₜ₊₁ + γ²rₜ₊₂ + ... + γⁿ maxₐ Q(sₜ₊ₙ, a)
+```
+
+Por exemplo, em um método de três passos, o agente considera:
+
+1. a recompensa recebida no instante atual;
+2. a recompensa recebida no passo seguinte;
+3. a recompensa recebida no segundo passo seguinte;
+4. a estimativa futura a partir do terceiro estado.
+
+Essa abordagem faz com que as recompensas sejam propagadas mais rapidamente para as ações que contribuíram para obtê-las. Porém, utilizar muitos passos pode aumentar a variância das atualizações e tornar o aprendizado mais sensível às estimativas incorretas.
+
+**Quando usar:** quando as recompensas são atrasadas e é necessário propagar informações de longo alcance mais rapidamente.
+
+**Quando não usar:** quando o ambiente possui muito ruído ou quando o uso de muitos passos provoca atualizações instáveis.
+
+---
+
+## 1.9. Combinação das melhorias e variantes do DQN
+
+As melhorias do DQN podem ser combinadas para aproveitar diferentes vantagens. Uma combinação conhecida é o **Rainbow DQN**, que reúne várias técnicas em um único agente.
+
+Entre as principais melhorias utilizadas estão:
+
+- **Double DQN** — reduz a superestimação dos valores Q.
+- **Dueling Network Architecture** — separa o valor do estado da vantagem de cada ação.
+- **Distributional DQN** — aprende a distribuição dos retornos.
+- **Multi-step Learning** — utiliza recompensas de vários passos.
+- **Prioritized Experience Replay** — prioriza experiências consideradas mais relevantes para o aprendizado.
+- **Noisy Networks** — utiliza ruído parametrizado para favorecer a exploração.
+
+A combinação dessas técnicas pode produzir um agente mais eficiente e robusto do que o DQN básico. Entretanto, o treinamento também se torna mais complexo, pois há mais hiperparâmetros, componentes e possibilidades de instabilidade.
+
+### Principais variantes do DQN
+
+Além do DQN original, existem diversas variantes:
+
+| Variante | Principal característica |
+|---|---|
+| **Double DQN** | Reduz a superestimação dos valores Q. |
+| **Dueling DQN** | Separa o valor do estado e a vantagem das ações. |
+| **Distributional DQN** | Aprende a distribuição dos retornos possíveis. |
+| **Multi-step DQN** | Utiliza recompensas acumuladas de vários passos. |
+| **Prioritized Experience Replay** | Amostra com maior frequência experiências mais relevantes. |
+| **Noisy DQN** | Introduz ruído aprendido nos parâmetros para exploração. |
+| **Rainbow DQN** | Combina várias melhorias do DQN em um único agente. |
+
+**Quando usar uma combinação:** quando o ambiente é complexo, possui recompensas atrasadas, elevada incerteza ou exige melhor eficiência de amostragem.
+
+**Quando não usar uma combinação:** durante os primeiros estudos ou em ambientes simples, nos quais é mais adequado começar com DQN básico e adicionar uma melhoria por vez. Dessa forma, fica mais fácil compreender o efeito de cada técnica e identificar a origem de eventuais problemas.
 
 ---
 
@@ -459,6 +807,666 @@ print("Policy Gradient treinado com sucesso!")
 
 ---
 
+
+---
+
+## 💻 Código 5: Double DQN
+
+O ponto principal do **Double DQN** é separar duas decisões que, no DQN comum, ficam misturadas:
+
+1. a `q_net` **escolhe** a melhor ação;
+2. a `target_net` **avalia** o valor dessa ação.
+
+No DQN comum, poderíamos fazer diretamente:
+
+```python
+next_q = target_net(next_states).max(1, keepdim=True)[0]
+```
+
+No Double DQN, fazemos em duas etapas:
+
+```python
+next_actions = q_net(next_states).argmax(1, keepdim=True)
+next_q = target_net(next_states).gather(1, next_actions)
+```
+
+Assim, a rede alvo não escolhe a ação que vai avaliar.
+
+```python
+import torch
+import torch.nn as nn
+
+class QNetwork(nn.Module):
+    def __init__(self, state_dim, action_dim):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, action_dim)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
+# Exemplo: 4 informações no estado e 2 ações possíveis.
+q_net = QNetwork(4, 2)
+target_net = QNetwork(4, 2)
+
+# Normalmente a rede alvo é uma cópia inicial da principal.
+target_net.load_state_dict(q_net.state_dict())
+
+states = torch.randn(8, 4)
+next_states = torch.randn(8, 4)
+rewards = torch.randn(8, 1)
+dones = torch.zeros(8, 1)
+
+gamma = 0.99
+
+# Ações que realmente foram executadas.
+actions = torch.randint(0, 2, (8, 1))
+current_q = q_net(states).gather(1, actions)
+
+with torch.no_grad():
+    # 1. A REDE PRINCIPAL escolhe a melhor ação.
+    next_actions = q_net(next_states).argmax(
+        dim=1,
+        keepdim=True
+    )
+
+    # 2. A REDE ALVO avalia a ação escolhida.
+    next_q = target_net(next_states).gather(
+        1,
+        next_actions
+    )
+
+    # 3. Montamos o alvo de Bellman.
+    target = rewards + (1 - dones) * gamma * next_q
+
+loss = nn.MSELoss()(current_q, target)
+
+print("Q atual:", current_q[:3])
+print("Ação escolhida pela q_net:", next_actions[:3])
+print("Target:", target[:3])
+print("Loss:", loss.item())
+```
+
+### O que observar
+
+Imagine que, para um próximo estado, a `q_net` estime:
+
+```text
+Ação 0 → 4.0
+Ação 1 → 5.0
+```
+
+A `q_net` escolhe a ação `1`.
+
+Agora suponha que a `target_net` estime:
+
+```text
+Ação 0 → 4.2
+Ação 1 → 4.7
+```
+
+O Double DQN usa **4.7**, porque a `q_net` escolheu a ação `1` e a `target_net` apenas avaliou essa escolha.
+
+No DQN convencional, a própria `target_net` faria o `max()` e escolheria a ação com base em suas próprias estimativas.
+
+---
+
+## 💻 Código 6: Dueling DQN
+
+A arquitetura **Dueling** mantém uma parte da rede compartilhada e depois cria dois fluxos:
+
+```text
+Estado
+  │
+  ▼
+Camadas compartilhadas
+  ├──────────────► V(s)
+  │
+  └──────────────► A(s, a)
+                       │
+                       ▼
+                     Q(s,a)
+```
+
+O código abaixo implementa a combinação:
+
+```text
+Q(s, a) = V(s) + A(s, a) - média(A(s, a))
+```
+
+```python
+import torch
+import torch.nn as nn
+
+class DuelingDQN(nn.Module):
+    def __init__(self, state_dim, action_dim):
+        super().__init__()
+
+        # Parte compartilhada:
+        # extrai características do estado.
+        self.feature = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU()
+        )
+
+        # Value stream:
+        # produz UM valor para o estado inteiro.
+        self.value_stream = nn.Sequential(
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1)
+        )
+
+        # Advantage stream:
+        # produz UM valor para cada ação.
+        self.advantage_stream = nn.Sequential(
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, action_dim)
+        )
+
+    def forward(self, x):
+        features = self.feature(x)
+
+        # V(s)
+        value = self.value_stream(features)
+
+        # A(s,a)
+        advantage = self.advantage_stream(features)
+
+        # Q(s,a) = V(s) + A(s,a) - média das vantagens
+        q_values = (
+            value
+            + advantage
+            - advantage.mean(dim=1, keepdim=True)
+        )
+
+        return q_values
+
+
+net = DuelingDQN(
+    state_dim=4,
+    action_dim=2
+)
+
+state = torch.randn(1, 4)
+
+q_values = net(state)
+
+print("Q-values:", q_values)
+print("Melhor ação:", q_values.argmax(dim=1).item())
+```
+
+### O que acontece dentro da rede?
+
+Se a rede produzir:
+
+```text
+V(s) = 10
+
+A(s, 0) = -2
+A(s, 1) = +2
+```
+
+A média das vantagens é `0`, então:
+
+```text
+Q(s, 0) = 10 - 2 = 8
+Q(s, 1) = 10 + 2 = 12
+```
+
+A ideia é que a rede possa aprender separadamente:
+
+- **"Este estado é bom ou ruim?"** → `V(s)`
+- **"Qual ação é melhor ou pior neste estado?"** → `A(s,a)`
+
+Isso é especialmente interessante quando várias ações são parecidas.
+
+---
+
+## 💻 Código 7: Distributional DQN (C51)
+
+No **Distributional DQN**, a saída deixa de ser simplesmente:
+
+```text
+ação → Q-value
+```
+
+e passa a ser:
+
+```text
+ação → probabilidades sobre vários retornos
+```
+
+No C51, definimos previamente os *atoms*, que são os valores possíveis usados para representar a distribuição.
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class C51Network(nn.Module):
+    def __init__(self, state_dim, action_dim, num_atoms=51):
+        super().__init__()
+
+        self.action_dim = action_dim
+        self.num_atoms = num_atoms
+
+        self.feature = nn.Sequential(
+            nn.Linear(state_dim, 128),
+            nn.ReLU()
+        )
+
+        # Cada ação terá uma distribuição com num_atoms probabilidades.
+        self.output = nn.Linear(
+            128,
+            action_dim * num_atoms
+        )
+
+    def forward(self, x):
+        features = self.feature(x)
+
+        logits = self.output(features)
+
+        # [batch, ações, atoms]
+        logits = logits.view(
+            -1,
+            self.action_dim,
+            self.num_atoms
+        )
+
+        # Softmax transforma os logits em probabilidades.
+        probabilities = F.softmax(logits, dim=2)
+
+        return probabilities
+
+
+num_atoms = 51
+v_min = -10
+v_max = 10
+
+# Valores que representam os possíveis retornos.
+atoms = torch.linspace(
+    v_min,
+    v_max,
+    num_atoms
+)
+
+net = C51Network(
+    state_dim=4,
+    action_dim=2,
+    num_atoms=num_atoms
+)
+
+states = torch.randn(3, 4)
+
+# [3 estados, 2 ações, 51 atoms]
+distribution = net(states)
+
+print("Formato:", distribution.shape)
+
+# O valor esperado de cada ação é:
+# Q(s,a) = soma(probabilidade * atom)
+q_values = (distribution * atoms).sum(dim=2)
+
+print("Q-values esperados:")
+print(q_values)
+
+# A ação escolhida continua podendo ser obtida
+# pelo maior valor esperado.
+actions = q_values.argmax(dim=1)
+
+print("Melhores ações:", actions)
+```
+
+### Entendendo a saída
+
+Suponha que uma ação possua:
+
+```text
+Atom 5  → 0.30
+Atom 10 → 0.50
+Atom 20 → 0.20
+```
+
+O valor esperado será:
+
+```text
+Q = 5(0.30) + 10(0.50) + 20(0.20)
+Q = 1.5 + 5 + 4
+Q = 10.5
+```
+
+Portanto, o Distributional DQN consegue representar a **distribuição** e ainda obter o Q-value tradicional através da média.
+
+O exemplo acima mostra a cabeça de distribuição e o cálculo do valor esperado. Uma implementação completa do C51 também precisa realizar a **projeção da distribuição alvo** sobre os atoms fixos durante o treinamento.
+
+---
+
+## 💻 Código 8: Multi-step Learning
+
+No DQN de um passo, o alvo é:
+
+```text
+rₜ + γ max Q(sₜ₊₁, a)
+```
+
+No exemplo abaixo vamos utilizar `n = 3`. Isso significa que acumulamos três recompensas antes de usar a estimativa do estado futuro.
+
+```python
+import torch
+
+def calculate_n_step_target(rewards, next_q, gamma):
+    """
+    rewards:
+        Lista com as recompensas dos n passos.
+
+    next_q:
+        Melhor Q-value estimado depois dos n passos.
+
+    gamma:
+        Fator de desconto.
+    """
+
+    # Começamos pela estimativa futura.
+    target = next_q
+
+    # Adicionamos as recompensas de trás para frente.
+    for reward in reversed(rewards):
+        target = reward + gamma * target
+
+    return target
+
+
+# Exemplo com 3 recompensas:
+# r_t, r_t+1, r_t+2
+rewards = [
+    torch.tensor([[1.0]]),
+    torch.tensor([[2.0]]),
+    torch.tensor([[3.0]])
+]
+
+next_q = torch.tensor([[5.0]])
+
+gamma = 0.99
+
+target = calculate_n_step_target(
+    rewards,
+    next_q,
+    gamma
+)
+
+print("Target de 3 passos:", target.item())
+```
+
+Uma forma mais direta de visualizar o mesmo cálculo é:
+
+```python
+r0 = 1.0
+r1 = 2.0
+r2 = 3.0
+q3 = 5.0
+
+target = (
+    r0
+    + gamma * r1
+    + gamma**2 * r2
+    + gamma**3 * q3
+)
+
+print(target)
+```
+
+### O que o código está fazendo?
+
+Para `n = 3`, o alvo possui a estrutura:
+
+```text
+r0 + γr1 + γ²r2 + γ³Q(s3, a)
+```
+
+Ou seja, a atualização de `s0` já recebe informação de três recompensas futuras antes de depender apenas da estimativa da rede.
+
+### Uma observação importante
+
+Em uma implementação real, quando o episódio termina antes de completar `n` passos, não devemos inventar recompensas futuras. Nesse caso, o retorno é truncado no estado terminal.
+
+---
+
+## 💻 Código 9: Combinação das melhorias — Mini Rainbow
+
+O **Rainbow DQN** combina diversas melhorias em um único agente. O objetivo deste exemplo é mostrar a arquitetura da combinação de forma didática.
+
+Aqui vamos combinar diretamente:
+
+- **Double DQN**;
+- **Dueling Network**;
+- **Distributional DQN (C51)**;
+- **Multi-step Learning**.
+
+O Rainbow completo também inclui **Prioritized Experience Replay** e **Noisy Networks**.
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class MiniRainbow(nn.Module):
+    def __init__(self, state_dim, action_dim, num_atoms=51):
+        super().__init__()
+
+        self.action_dim = action_dim
+        self.num_atoms = num_atoms
+
+        # Parte compartilhada.
+        self.feature = nn.Sequential(
+            nn.Linear(state_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU()
+        )
+
+        # Dueling + Distributional:
+        # cada stream produz uma distribuição
+        # sobre os atoms.
+        self.value_stream = nn.Linear(128, num_atoms)
+
+        self.advantage_stream = nn.Linear(
+            128,
+            action_dim * num_atoms
+        )
+
+    def forward(self, state):
+        features = self.feature(state)
+
+        # V(s), agora representado por atoms.
+        value = self.value_stream(features)
+        value = value.view(-1, 1, self.num_atoms)
+
+        # A(s,a), também representado por atoms.
+        advantage = self.advantage_stream(features)
+        advantage = advantage.view(
+            -1,
+            self.action_dim,
+            self.num_atoms
+        )
+
+        # Combinação Dueling:
+        # Q = V + A - média(A)
+        logits = (
+            value
+            + advantage
+            - advantage.mean(dim=1, keepdim=True)
+        )
+
+        # Distribuição final.
+        probabilities = F.softmax(logits, dim=2)
+
+        return probabilities
+
+
+# -----------------------------
+# CONFIGURAÇÃO
+# -----------------------------
+
+state_dim = 4
+action_dim = 2
+num_atoms = 51
+
+v_min = -10
+v_max = 10
+
+atoms = torch.linspace(v_min, v_max, num_atoms)
+
+q_net = MiniRainbow(state_dim, action_dim, num_atoms)
+target_net = MiniRainbow(state_dim, action_dim, num_atoms)
+
+target_net.load_state_dict(q_net.state_dict())
+
+
+# -----------------------------
+# DOUBLE DQN + DISTRIBUTIONAL
+# -----------------------------
+
+states = torch.randn(8, state_dim)
+next_states = torch.randn(8, state_dim)
+
+with torch.no_grad():
+
+    # 1. A q_net escolhe a ação usando
+    # o valor esperado da distribuição.
+    next_distribution = q_net(next_states)
+
+    next_q = (next_distribution * atoms).sum(dim=2)
+
+    next_actions = next_q.argmax(dim=1)
+
+    # 2. A target_net avalia a ação escolhida.
+    target_distribution = target_net(next_states)
+
+    chosen_distribution = target_distribution[
+        torch.arange(len(next_states)),
+        next_actions
+    ]
+
+    print(
+        "Distribuição escolhida:",
+        chosen_distribution.shape
+    )
+
+
+# -----------------------------
+# MULTI-STEP
+# -----------------------------
+
+gamma = 0.99
+n = 3
+
+# Três recompensas consecutivas.
+r0 = torch.ones(8, 1)
+r1 = torch.ones(8, 1)
+r2 = torch.ones(8, 1)
+
+# Parte conhecida do retorno n-step:
+#
+# r0 + γr1 + γ²r2
+#
+# Em uma implementação completa de Distributional DQN,
+# a distribuição futura também é deslocada e projetada
+# sobre os atoms.
+
+multi_step_return = (
+    r0
+    + gamma * r1
+    + gamma**2 * r2
+)
+
+print(
+    "Retorno acumulado de 3 passos:",
+    multi_step_return[:3]
+)
+
+
+# -----------------------------
+# ESCOLHA DA AÇÃO
+# -----------------------------
+
+with torch.no_grad():
+
+    distribution = q_net(states)
+
+    # Esperança da distribuição.
+    q_values = (distribution * atoms).sum(dim=2)
+
+    actions = q_values.argmax(dim=1)
+
+print("Q-values:", q_values[:3])
+print("Ações escolhidas:", actions[:3])
+```
+
+### Como as melhorias se encaixam?
+
+Podemos visualizar o fluxo:
+
+```text
+                    Estado
+                      │
+                      ▼
+                Rede Dueling
+                 ┌────┴────┐
+                 ▼         ▼
+               V(s)       A(s,a)
+                 └────┬────┘
+                      ▼
+              Distribuição C51
+                      │
+                      ▼
+                Q esperado
+                      │
+                ┌─────┴─────┐
+                ▼           ▼
+             Seleção      Avaliação
+             q_net       target_net
+                │           │
+                └─────┬─────┘
+                      ▼
+                Alvo Double DQN
+                      │
+              + retorno n-step
+                      │
+                      ▼
+                   Loss
+                      │
+                      ▼
+                 Atualização
+```
+
+O ponto mais importante é perceber que **as melhorias não são cinco algoritmos completamente separados**. Elas modificam partes diferentes do mesmo processo:
+
+```text
+Double DQN
+→ como escolhemos e avaliamos a próxima ação
+
+Dueling
+→ como a rede representa V(s) e A(s,a)
+
+Distributional
+→ o que a rede aprende sobre o retorno
+
+Multi-step
+→ quantas recompensas entram no alvo
+
+Rainbow
+→ combina várias dessas ideias
+```
+
+O exemplo é propositalmente didático. Uma implementação completa do Rainbow ainda precisaria integrar corretamente, no treinamento, componentes como **Prioritized Experience Replay**, **Noisy Networks**, a **loss/projeção do C51** e o tratamento completo do retorno multi-step.
+
 # 📚 Referências
 
 Adicione aqui as referências utilizadas nos estudos.
@@ -476,5 +1484,10 @@ Adicione aqui as referências utilizadas nos estudos.
 - [11] Target Value
 - [12] Target Network
 - [13] Experience Replay
+- [14] Double DQN
+- [15] Dueling Network Architecture
+- [16] Distributional DQN
+- [17] Multi-step Learning
+- [18] Rainbow DQN e combinações de melhorias do DQN
 
 [⬆️ Voltar ao índice](#-estudos-de-aprendizado-por-reforço-deep-rl)
