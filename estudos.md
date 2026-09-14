@@ -94,7 +94,7 @@ No Distributional DQN, a variável aleatória `Z(s, a)` representa diferentes re
 - uma ação com retorno médio semelhante, porém mais consistente;
 - uma ação com possibilidade de recompensa muito alta ou muito baixa.
 
-A distribuição pode ser representada de diferentes maneiras. Uma abordagem conhecida é o **Categorical DQN (C51)**, que utiliza um conjunto fixo de valores possíveis, chamados de *atoms*, e aprende a probabilidade associada a cada um deles.
+A distribuição pode ser representada de diferentes maneiras. Uma abordagem conhecida é o **Categorical DQN (C51)**, que utiliza um conjunto fixo de valores possíveis, chamados de _atoms_, e aprende a probabilidade associada a cada um deles.
 
 Em vez de retornar apenas:
 
@@ -170,15 +170,15 @@ A combinação dessas técnicas pode produzir um agente mais eficiente e robusto
 
 Além do DQN original, existem diversas variantes:
 
-| Variante | Principal característica |
-|---|---|
-| **Double DQN** | Reduz a superestimação dos valores Q. |
-| **Dueling DQN** | Separa o valor do estado e a vantagem das ações. |
-| **Distributional DQN** | Aprende a distribuição dos retornos possíveis. |
-| **Multi-step DQN** | Utiliza recompensas acumuladas de vários passos. |
+| Variante                          | Principal característica                                   |
+| --------------------------------- | ---------------------------------------------------------- |
+| **Double DQN**                    | Reduz a superestimação dos valores Q.                      |
+| **Dueling DQN**                   | Separa o valor do estado e a vantagem das ações.           |
+| **Distributional DQN**            | Aprende a distribuição dos retornos possíveis.             |
+| **Multi-step DQN**                | Utiliza recompensas acumuladas de vários passos.           |
 | **Prioritized Experience Replay** | Amostra com maior frequência experiências mais relevantes. |
-| **Noisy DQN** | Introduz ruído aprendido nos parâmetros para exploração. |
-| **Rainbow DQN** | Combina várias melhorias do DQN em um único agente. |
+| **Noisy DQN**                     | Introduz ruído aprendido nos parâmetros para exploração.   |
+| **Rainbow DQN**                   | Combina várias melhorias do DQN em um único agente.        |
 
 **Quando usar uma combinação:** quando o ambiente é complexo, possui recompensas atrasadas, elevada incerteza ou exige melhor eficiência de amostragem.
 
@@ -370,7 +370,7 @@ No Distributional DQN, a variável aleatória `Z(s, a)` representa diferentes re
 - uma ação com retorno médio semelhante, porém mais consistente;
 - uma ação com possibilidade de recompensa muito alta ou muito baixa.
 
-A distribuição pode ser representada de diferentes maneiras. Uma abordagem conhecida é o **Categorical DQN (C51)**, que utiliza um conjunto fixo de valores possíveis, chamados de *atoms*, e aprende a probabilidade associada a cada um deles.
+A distribuição pode ser representada de diferentes maneiras. Uma abordagem conhecida é o **Categorical DQN (C51)**, que utiliza um conjunto fixo de valores possíveis, chamados de _atoms_, e aprende a probabilidade associada a cada um deles.
 
 Em vez de retornar apenas:
 
@@ -442,15 +442,15 @@ A combinação dessas técnicas pode produzir um agente mais eficiente e robusto
 
 Além do DQN original, existem diversas variantes:
 
-| Variante | Principal característica |
-|---|---|
-| **Double DQN** | Reduz a superestimação dos valores Q. |
-| **Dueling DQN** | Separa o valor do estado e a vantagem das ações. |
-| **Distributional DQN** | Aprende a distribuição dos retornos possíveis. |
-| **Multi-step DQN** | Utiliza recompensas acumuladas de vários passos. |
+| Variante                          | Principal característica                                   |
+| --------------------------------- | ---------------------------------------------------------- |
+| **Double DQN**                    | Reduz a superestimação dos valores Q.                      |
+| **Dueling DQN**                   | Separa o valor do estado e a vantagem das ações.           |
+| **Distributional DQN**            | Aprende a distribuição dos retornos possíveis.             |
+| **Multi-step DQN**                | Utiliza recompensas acumuladas de vários passos.           |
 | **Prioritized Experience Replay** | Amostra com maior frequência experiências mais relevantes. |
-| **Noisy DQN** | Introduz ruído aprendido nos parâmetros para exploração. |
-| **Rainbow DQN** | Combina várias melhorias do DQN em um único agente. |
+| **Noisy DQN**                     | Introduz ruído aprendido nos parâmetros para exploração.   |
+| **Rainbow DQN**                   | Combina várias melhorias do DQN em um único agente.        |
 
 **Quando usar uma combinação:** quando o ambiente é complexo, possui recompensas atrasadas, elevada incerteza ou exige melhor eficiência de amostragem.
 
@@ -504,72 +504,493 @@ print("Simulação concluída!")
 import gymnasium as gym
 import numpy as np
 
-# 1. CONFIGURAÇÃO DO AMBIENTE
-# Cria o ambiente "FrozenLake" (Lago Congelado).
-# is_slippery=False significa que o gelo não escorrega (se o agente tentar ir para a direita, ele vai para a direita).
-env = gym.make("FrozenLake-v1", is_slippery=False)
 
+# ============================================================
+# 1. CONFIGURAÇÃO DO AMBIENTE
+# ============================================================
+
+# Cria o ambiente "FrozenLake" (Lago Congelado).
+#
+# O mapa padrão possui 4x4 posições:
+#
+#     0   1   2   3
+#     4   5   6   7
+#     8   9  10  11
+#    12  13  14  15
+#
+# Portanto, temos 16 estados possíveis.
+#
+# is_slippery=False significa que o gelo NÃO escorrega.
+# Se o agente escolher "direita", ele realmente irá para a direita.
+#
+# Se fosse True, poderia acontecer de o agente tentar ir
+# para a direita e acabar indo para outra direção.
+
+env = gym.make(
+    "FrozenLake-v1",
+    is_slippery=False
+)
+
+
+# ============================================================
 # 2. INICIALIZAÇÃO DA TABELA Q
-# A Tabela Q é o "cérebro" do agente. Ela mapeia qual a utilidade de tomar cada ação em cada estado.
-# Criamos uma matriz cheia de zeros com o tamanho (Número de Estados x Número de Ações).
+# ============================================================
+
+# A Q-Table é o "cérebro" do agente.
+#
+# Ela guarda:
+#
+#     "Quanto vale tomar determinada ação em determinado estado?"
+#
+# Temos:
+#
+#     16 estados
+#     4 ações
+#
+# Portanto, nossa tabela terá:
+#
+#     16 linhas x 4 colunas
+#
+# Cada LINHA representa um estado.
+#
+# Cada COLUNA representa uma ação.
+#
+# A tabela inicialmente é preenchida com zeros porque
+# o agente ainda não aprendeu nada.
+
 q_table = np.zeros((
-    env.observation_space.n, # Linhas: todos os estados possíveis (posições no mapa)
-    env.action_space.n       # Colunas: todas as ações possíveis (cima, baixo, esquerda, direita)
+    env.observation_space.n,   # 16 estados (linhas)
+    env.action_space.n          # 4 ações (colunas)
 ))
 
-# 3. HIPERPARÂMETROS
-alpha = 0.1      # Taxa de aprendizado: define o peso da nova informação em relação à antiga (10%).
-gamma = 0.99     # Fator de desconto: define o quanto o agente valoriza recompensas futuras vs imediatas.
-epsilon = 0.1    # Taxa de exploração: 10% de chance do agente tomar uma ação aleatória para descobrir novos caminhos.
 
-# 4. LOOP DE TREINAMENTO (1000 partidas)
+# A tabela começa aproximadamente assim:
+#
+#              ←    →    ↑    ↓
+#
+# estado 0     0    0    0    0
+# estado 1     0    0    0    0
+# estado 2     0    0    0    0
+# estado 3     0    0    0    0
+# ...
+# estado 15    0    0    0    0
+#
+# Ou seja:
+#
+# q_table[estado, ação]
+#
+# representa o valor de determinada ação em determinado estado.
+
+
+# ============================================================
+# 3. HIPERPARÂMETROS
+# ============================================================
+
+# ALPHA = taxa de aprendizado.
+#
+# Define quanto da nova informação será incorporada
+# na informação que já estava na Q-Table.
+#
+# 0.1 = 10%
+#
+# Portanto, o agente não substitui completamente o valor antigo.
+# Ele se aproxima 10% do novo valor descoberto.
+
+alpha = 0.1
+
+
+# GAMMA = fator de desconto.
+#
+# Define o quanto o agente valoriza recompensas futuras.
+#
+# 0.99 significa que recompensas futuras são consideradas
+# muito importantes.
+
+gamma = 0.99
+
+
+# EPSILON = taxa de exploração.
+#
+# 10% das vezes o agente escolherá uma ação aleatória
+# para tentar descobrir coisas novas.
+#
+# Nos outros 90%, ele escolherá a ação que atualmente
+# considera melhor.
+
+epsilon = 0.1
+
+
+# ============================================================
+# 4. LOOP DE TREINAMENTO
+# ============================================================
+
+# O agente jogará 1000 partidas (episódios).
+
 for episode in range(1000):
 
-    # Reseta o ambiente para começar um novo episódio.
-    # 'state' recebe a posição inicial. O '_' ignora informações extras que não usaremos.
+
+    # --------------------------------------------------------
+    # COMEÇO DE UM NOVO EPISÓDIO
+    # --------------------------------------------------------
+
+    # Reinicia o FrozenLake.
+    #
+    # state = estado inicial do agente.
+    #
+    # O "_" recebe informações extras que não vamos utilizar.
+
     state, _ = env.reset()
 
-    done = False # Controla se o episódio atual acabou (vitória, derrota ou limite de tempo)
+
+    # Controla se o episódio terminou.
+    #
+    # False = ainda está jogando
+    # True  = episódio terminou
+
+    done = False
+
+
+    # Continua jogando enquanto o episódio não terminar.
 
     while not done:
 
-        # 5. ESCOLHA DA AÇÃO (Estratégia Epsilon-Greedy)
-        # Sorteia um número entre 0 e 1. Se for menor que 0.1, o agente "explora" (ação aleatória).
+
+        # ====================================================
+        # 5. ESCOLHA DA AÇÃO
+        # ====================================================
+        #
+        # Utilizamos a estratégia EPSILON-GREEDY.
+        #
+        # O agente possui duas possibilidades:
+        #
+        # 1. EXPLORAR
+        #    Escolher uma ação aleatória.
+        #
+        # 2. EXPLOTAR
+        #    Escolher a melhor ação que ele conhece atualmente.
+        #
+        # Como epsilon = 0.1:
+        #
+        # 10% -> exploração
+        # 90% -> exploração do conhecimento atual
+
+
+        # Sorteia um número entre 0 e 1.
+
         if np.random.uniform(0, 1) < epsilon:
+
+
+            # ------------------------------------------------
+            # EXPLORAÇÃO
+            # ------------------------------------------------
+            #
+            # O agente ignora temporariamente o que aprendeu
+            # e escolhe uma ação aleatória.
+            #
+            # Isso permite descobrir caminhos novos.
+
             action = env.action_space.sample()
+
+
         else:
-            # Caso contrário, o agente "explota" (escolhe a melhor ação que já aprendeu para este estado).
+
+
+            # ------------------------------------------------
+            # EXPLOTAÇÃO
+            # ------------------------------------------------
+            #
+            # Agora o agente olha para a linha correspondente
+            # ao estado atual.
+            #
+            # Por exemplo, se:
+            #
+            # state = 0
+            #
+            # então:
+            #
+            # q_table[0]
+            #
+            # pode ser:
+            #
+            # [0.2, 0.8, 0.1, 0.4]
+            #
+            # O maior valor é 0.8.
+            #
+            # np.argmax() retorna a posição desse maior valor.
+            #
+            # Nesse exemplo:
+            #
+            # np.argmax([0.2, 0.8, 0.1, 0.4])
+            #
+            # retorna:
+            #
+            # 1
+            #
+            # Portanto, a ação 1 será escolhida.
+
             action = np.argmax(q_table[state])
 
+
+        # ====================================================
         # 6. INTERAÇÃO COM O AMBIENTE
-        # O agente executa a ação e o ambiente retorna as consequências:
+        # ====================================================
+
+        # O agente executa a ação que escolheu.
+        #
+        # O ambiente então responde dizendo o que aconteceu.
+        #
+        # Recebemos:
+        #
+        # next_state -> próximo estado
+        # reward     -> recompensa recebida
+        # terminated -> terminou naturalmente?
+        # truncated  -> terminou por limite de passos?
+        # _          -> informação extra que não utilizaremos
+
         next_state, reward, terminated, truncated, _ = env.step(action)
 
-        # O episódio acaba se o agente caiu no buraco/chegou no objetivo (terminated)
-        # ou se excedeu o limite de passos permitidos (truncated).
+
+        # O episódio terminou se:
+        #
+        # - o agente chegou ao objetivo;
+        # - o agente caiu em um buraco;
+        # - ou atingiu o limite de passos.
+        #
+        # Por isso usamos:
+        #
+        # terminated OR truncated
+
         done = terminated or truncated
 
-        # 7. ATUALIZAÇÃO DA TABELA Q (Equação de Bellman)
-        # Primeiro, olhamos para o próximo estado e vemos qual é a melhor ação possível lá.
-        best_next_action = np.argmax(q_table[next_state])
 
-        # Calculamos o "Alvo" (Target): a recompensa real recebida + a estimativa da melhor recompensa futura.
+        # ====================================================
+        # 7. ATUALIZAÇÃO DA Q-TABLE
+        # ====================================================
+
+        # Aqui está a parte mais importante do Q-Learning.
+        #
+        # O agente acabou de fazer:
+        #
+        #     estado atual
+        #          ↓
+        #       ação
+        #          ↓
+        #     próximo estado
+        #
+        # Por exemplo:
+        #
+        #     estado 0
+        #        ↓
+        #      ação
+        #        ↓
+        #     estado 4
+        #
+        # Agora precisamos perguntar:
+        #
+        # "O estado 4 parece ser um estado bom ou ruim?"
+
+
+        # ----------------------------------------------------
+        # 7.1 ENCONTRAR A MELHOR AÇÃO NO PRÓXIMO ESTADO
+        # ----------------------------------------------------
+
+        # Primeiro pegamos a linha do próximo estado.
+        #
+        # Se:
+        #
+        # next_state = 4
+        #
+        # então:
+        #
+        # q_table[next_state]
+        #
+        # é:
+        #
+        # q_table[4]
+        #
+        # Imagine que seja:
+        #
+        # [0.0, 0.0, 0.8, 0.3]
+        #
+        # Isso significa:
+        #
+        # ação 0 -> valor 0.0
+        # ação 1 -> valor 0.0
+        # ação 2 -> valor 0.8
+        # ação 3 -> valor 0.3
+        #
+        # A melhor ação seria a ação 2.
+
+
+        best_next_action = np.argmax(
+            q_table[next_state]
+        )
+
+
+        # ----------------------------------------------------
+        # 7.2 CALCULAR O TARGET
+        # ----------------------------------------------------
+
+        # Agora calculamos quanto a ação anterior
+        # deveria valer.
+        #
+        # A fórmula é:
+        #
+        #     TARGET =
+        #
+        #     recompensa recebida AGORA
+        #
+        #     +
+        #
+        #     recompensa futura estimada
+        #
+        # A recompensa futura é multiplicada por GAMMA.
+        #
+        # Fórmula:
+        #
+        #     reward + gamma * melhor_valor_do_próximo_estado
+        #
+        #
+        # Imagine:
+        #
+        # reward = 0
+        #
+        # gamma = 0.99
+        #
+        # e descobrimos que:
+        #
+        # q_table[next_state, best_next_action] = 0.8
+        #
+        # Então:
+        #
+        #     target = 0 + 0.99 * 0.8
+        #
+        #     target = 0.792
+        #
+        # Isso significa:
+        #
+        # "Eu não ganhei nada AGORA,
+        # mas o próximo estado parece ser muito bom.
+        # Portanto, a ação que me trouxe até aqui
+        # também deve ter algum valor."
+
+
         td_target = (
             reward
             + gamma * q_table[next_state, best_next_action]
         )
 
-        # Atualizamos o valor da ação que acabamos de tomar na Tabela Q.
-        # Fórmula: Valor Antigo + Taxa de Aprendizado * (Alvo - Valor Antigo)
+
+        # ----------------------------------------------------
+        # 7.3 ATUALIZAR O VALOR NA Q-TABLE
+        # ----------------------------------------------------
+
+        # Agora atualizamos o valor da ação que o agente
+        # ACABOU DE TOMAR.
+        #
+        # É importante perceber isso:
+        #
+        # q_table[state, action]
+        #
+        # representa:
+        #
+        # "Quanto eu achava que valia tomar essa ação
+        # naquele estado?"
+        #
+        #
+        # Imagine:
+        #
+        # state = 0
+        # action = 1
+        #
+        # Então estamos atualizando:
+        #
+        # q_table[0, 1]
+
+
+        # A fórmula é:
+        #
+        # NOVO VALOR =
+        #
+        # VALOR ANTIGO
+        #
+        # +
+        #
+        # ALPHA *
+        #
+        # (TARGET - VALOR ANTIGO)
+        #
+        #
+        # Imagine:
+        #
+        # valor antigo = 0
+        # target       = 0.792
+        # alpha        = 0.1
+        #
+        #
+        # Então:
+        #
+        #     0 + 0.1 * (0.792 - 0)
+        #
+        #     0 + 0.0792
+        #
+        #     = 0.0792
+        #
+        #
+        # Portanto, a Q-Table passa de:
+        #
+        # [0, 0, 0, 0]
+        #
+        # para algo como:
+        #
+        # [0, 0.0792, 0, 0]
+        #
+        #
+        # O agente acabou de aprender que aquela ação
+        # parece ter algum valor.
+
+
         q_table[state, action] += (
             alpha
             * (td_target - q_table[state, action])
         )
 
-        # O agente avança fisicamente para o próximo estado para o próximo ciclo.
+
+        # ====================================================
+        # 8. AVANÇAR PARA O PRÓXIMO ESTADO
+        # ====================================================
+
+        # Agora o agente realmente "avança" no ambiente.
+        #
+        # Antes:
+        #
+        #     state = 0
+        #
+        # Ele executou uma ação e chegou ao:
+        #
+        #     next_state = 4
+        #
+        # Então fazemos:
+        #
+        #     state = next_state
+        #
+        # Agora:
+        #
+        #     state = 4
+        #
+        # Na próxima repetição do while, o agente estará
+        # tomando uma decisão a partir do estado 4.
+
         state = next_state
 
-# Fecha o ambiente ao terminar todo o treinamento para liberar memória.
+
+# ============================================================
+# 9. FINALIZAÇÃO
+# ============================================================
+
+# Depois dos 1000 episódios, encerramos o ambiente
+# para liberar os recursos utilizados.
+
 env.close()
 
 ```
@@ -807,7 +1228,6 @@ print("Policy Gradient treinado com sucesso!")
 
 ---
 
-
 ---
 
 ## 💻 Código 5: Double DQN
@@ -1042,7 +1462,7 @@ e passa a ser:
 ação → probabilidades sobre vários retornos
 ```
 
-No C51, definimos previamente os *atoms*, que são os valores possíveis usados para representar a distribuição.
+No C51, definimos previamente os _atoms_, que são os valores possíveis usados para representar a distribuição.
 
 ```python
 import torch
