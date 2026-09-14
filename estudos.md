@@ -1010,112 +1010,618 @@ import numpy as np
 import random
 from collections import deque
 
-# 1. REDE NEURAL (O Cérebro do Agente)
-# Recebe os dados do ambiente (estado) e devolve uma nota (Q-value) para cada ação possível.
+
+# ============================================================
+# 1. REDE NEURAL
+# ============================================================
+
+# Esta classe representa o "cérebro" do nosso agente.
+#
+# Entrada:
+#   estado do ambiente
+#
+# Saída:
+#   um Q-value para cada ação possível
+#
+# No CartPole existem 2 ações:
+#   0 = mover para a esquerda
+#   1 = mover para a direita
+#
+# Portanto, a rede recebe 4 números e devolve 2 números.
+#
+# Exemplo:
+#
+# Estado:
+# [0.1, -0.2, 0.05, 0.3]
+#
+# Rede:
+# [0.72, 0.35]
+#
+# Isso significa:
+#
+# Q(estado, esquerda)  = 0.72
+# Q(estado, direita)   = 0.35
+#
+# Portanto, neste estado, a rede considera
+# "esquerda" a melhor ação.
+
+
 class QNetwork(nn.Module):
+
     def __init__(self, state_dim, action_dim):
+
+        # Inicializa a classe pai nn.Module.
+        # Isso é necessário para o PyTorch reconhecer
+        # esta classe como uma rede neural.
         super().__init__()
+
+        # Cria a arquitetura da rede.
         self.fc = nn.Sequential(
+
+            # Primeira camada:
+            #
+            # Recebe state_dim números.
+            # No CartPole:
+            # state_dim = 4
+            #
+            # Produz 64 números.
             nn.Linear(state_dim, 64),
+
+            # Função de ativação.
+            #
+            # Permite que a rede aprenda relações
+            # não lineares entre os dados.
             nn.ReLU(),
+
+            # Última camada:
+            #
+            # Recebe os 64 valores anteriores
+            # e produz action_dim valores.
+            #
+            # No CartPole:
+            # action_dim = 2
+            #
+            # Portanto:
+            #
+            # 4 entradas -> 64 -> 2 saídas
             nn.Linear(64, action_dim)
         )
 
     def forward(self, x):
+
+        # Quando fazemos:
+        #
+        # q_net(x)
+        #
+        # o PyTorch chama automaticamente este método.
+        #
+        # Aqui simplesmente passamos o estado
+        # pela rede neural.
         return self.fc(x)
 
 
-# 2. CONFIGURAÇÃO INICIAL
+# ============================================================
+# 2. CRIANDO O AMBIENTE
+# ============================================================
+
+# Cria o jogo CartPole.
+#
+# O objetivo é manter o bastão equilibrado
+# em cima do carrinho pelo maior tempo possível.
 env = gym.make("CartPole-v1")
+
+
+# Quantos números existem no estado?
+#
+# CartPole possui 4 informações:
+#
+# 1. posição do carrinho
+# 2. velocidade do carrinho
+# 3. ângulo do bastão
+# 4. velocidade angular do bastão
 state_dim = env.observation_space.shape[0]
+
+
+# Quantas ações existem?
+#
+# CartPole possui:
+#
+# 0 = esquerda
+# 1 = direita
 action_dim = env.action_space.n
 
-# No DQN, usamos DUAS redes neurais para manter o aprendizado estável.
-q_net = QNetwork(state_dim, action_dim)      # Rede Principal: joga e aprende ativamente
-target_net = QNetwork(state_dim, action_dim) # Rede Alvo: usada só de referência para a meta
-target_net.load_state_dict(q_net.state_dict()) # Começam idênticas
 
-optimizer = optim.Adam(q_net.parameters(), lr=0.001)
+# ============================================================
+# 3. CRIANDO AS DUAS REDES DO DQN
+# ============================================================
 
-# 3. MEMÓRIA (Replay Memory)
-# Guarda os últimos 10.000 acontecimentos. O agente aprende revendo o passado.
+# Rede Principal.
+#
+# É a rede que:
+# - escolhe ações
+# - recebe treinamento
+# - tem seus pesos modificados pelo optimizer
+q_net = QNetwork(state_dim, action_dim)
+
+
+# Rede Alvo.
+#
+# Ela serve como uma referência mais estável
+# para calcular os valores que a rede principal
+# deveria aprender.
+target_net = QNetwork(state_dim, action_dim)
+
+
+# Inicialmente copiamos os pesos da rede principal
+# para a rede alvo.
+#
+# Portanto:
+#
+# q_net = conhecimento inicial
+# target_net = exatamente o mesmo conhecimento
+target_net.load_state_dict(q_net.state_dict())
+
+
+# Adam é o algoritmo responsável por ajustar
+# os pesos da rede neural durante o aprendizado.
+#
+# lr = learning rate.
+#
+# 0.001 significa o tamanho dos passos usados
+# para modificar os pesos.
+optimizer = optim.Adam(
+    q_net.parameters(),
+    lr=0.001
+)
+
+
+# ============================================================
+# 4. MEMÓRIA DE EXPERIÊNCIAS
+# ============================================================
+
+# A memória guarda as experiências do agente.
+#
+# Cada experiência possui:
+#
+# (estado, ação, recompensa, próximo_estado, terminou)
+#
+# Exemplo:
+#
+# (
+#   [0.1, 0.2, -0.1, 0.3],
+#   1,
+#   1,
+#   [0.2, 0.3, -0.05, 0.4],
+#   False
+# )
+#
+# maxlen=10000 significa que podemos guardar
+# no máximo 10.000 experiências.
+#
+# Quando estiver cheia, experiências antigas
+# são automaticamente descartadas.
 replay_memory = deque(maxlen=10000)
 
-# 4. HIPERPARÂMETROS
-gamma = 0.99       # Fator de desconto (foco no longo prazo)
-batch_size = 64    # Quantas memórias ele revê por vez ao treinar
-C = 100            # Frequência (em passos) de atualização da Rede Alvo
-epsilon = 0.1      # Taxa de exploração (10% de chance de agir aleatoriamente)
 
+# ============================================================
+# 5. HIPERPARÂMETROS
+# ============================================================
+
+# Gamma:
+#
+# Define quanto o agente valoriza recompensas futuras.
+#
+# 0.99 = valoriza bastante o futuro.
+#
+# A ideia é:
+#
+# recompensa imediata
+# +
+# recompensa futura descontada
+gamma = 0.99
+
+
+# Quantas experiências serão utilizadas
+# em cada treinamento.
+#
+# Em vez de aprender usando apenas uma experiência,
+# pegamos 64 experiências aleatórias da memória.
+batch_size = 64
+
+
+# A cada quantos passos atualizamos a Rede Alvo.
+#
+# A cada 100 passos:
+#
+# target_net <- q_net
+C = 100
+
+
+# Epsilon controla exploração.
+#
+# 10% das vezes:
+#   ação aleatória
+#
+# 90% das vezes:
+#   melhor ação conhecida pela rede
+epsilon = 0.1
+
+
+# ============================================================
+# 6. PRIMEIRO ESTADO
+# ============================================================
+
+# Reinicia o ambiente.
+#
+# state contém o estado inicial.
 state, _ = env.reset()
 
-# 5. LOOP DE INTERAÇÃO E TREINAMENTO (1000 passos)
+
+# ============================================================
+# 7. LOOP PRINCIPAL
+# ============================================================
+
+# Vamos executar 1000 passos.
+#
+# IMPORTANTE:
+#
+# Isso são 1000 interações com o ambiente,
+# NÃO 1000 episódios.
 for step in range(1, 1001):
 
-    # Prepara o estado para a rede neural (transforma em Tensor do PyTorch)
+
+    # --------------------------------------------------------
+    # TRANSFORMAR O ESTADO EM TENSOR
+    # --------------------------------------------------------
+
+    # O ambiente devolve um array NumPy.
+    #
+    # O PyTorch trabalha com Tensors.
+    #
+    # FloatTensor transforma os números em Tensor.
+    #
+    # Exemplo:
+    #
+    # NumPy:
+    # [0.1, 0.2, -0.1, 0.3]
+    #
+    # Tensor:
+    # tensor([0.1, 0.2, -0.1, 0.3])
     state_tensor = torch.FloatTensor(state).unsqueeze(0)
 
-    # Escolhe a Ação (Epsilon-Greedy)
-    if random.random() < epsilon:
-        action = env.action_space.sample() # Explora (ação aleatória)
-    else:
-        with torch.no_grad():
-            # Explota (pede para a rede principal a ação com maior nota)
-            action = torch.argmax(q_net(state_tensor)).item()
 
-    # Executa a ação
+    # --------------------------------------------------------
+    # ESCOLHER AÇÃO
+    # --------------------------------------------------------
+
+    # Gera um número aleatório entre 0 e 1.
+    #
+    # Se for menor que epsilon:
+    # exploração.
+    #
+    # Caso contrário:
+    # exploração do conhecimento atual.
+    if random.random() < epsilon:
+
+        # EXPLORAÇÃO
+        #
+        # Escolhe uma ação aleatória.
+        action = env.action_space.sample()
+
+    else:
+
+        # EXPLOTAÇÃO
+        #
+        # Não precisamos calcular gradientes aqui,
+        # porque estamos apenas perguntando à rede
+        # qual ação ela considera melhor.
+        with torch.no_grad():
+
+            # A rede recebe o estado.
+            #
+            # Exemplo:
+            #
+            # q_net(state)
+            #
+            # poderia produzir:
+            #
+            # [0.73, 0.42]
+            #
+            # torch.argmax encontra o índice
+            # do maior valor.
+            #
+            # 0.73 é maior que 0.42
+            #
+            # portanto:
+            #
+            # action = 0
+            action = torch.argmax(
+                q_net(state_tensor)
+            ).item()
+
+
+    # --------------------------------------------------------
+    # EXECUTAR A AÇÃO
+    # --------------------------------------------------------
+
+    # Envia a ação escolhida para o ambiente.
+    #
+    # O ambiente responde:
+    #
+    # next_state = próximo estado
+    # reward = recompensa recebida
+    # terminated = terminou naturalmente
+    # truncated = terminou por limite de tempo
     next_state, reward, terminated, truncated, _ = env.step(action)
+
+
+    # Se terminou por qualquer motivo:
+    # done = True
     done = terminated or truncated
 
-    # Salva a experiência na Memória
-    replay_memory.append((state, action, reward, next_state, done))
+
+    # --------------------------------------------------------
+    # GUARDAR EXPERIÊNCIA
+    # --------------------------------------------------------
+
+    # Guardamos tudo que acabou de acontecer.
+    #
+    # O agente poderá rever essa experiência
+    # posteriormente durante o treinamento.
+    replay_memory.append((
+        state,
+        action,
+        reward,
+        next_state,
+        done
+    ))
+
+
+    # --------------------------------------------------------
+    # ATUALIZAR O ESTADO
+    # --------------------------------------------------------
 
     if done:
+
+        # Se o episódio acabou,
+        # começamos um novo episódio.
         state, _ = env.reset()
+
     else:
+
+        # Se ainda não acabou,
+        # o próximo estado vira o estado atual.
         state = next_state
 
-    # 6. TREINAMENTO (Aprende revendo o passado)
-    # Só treina se já tivermos guardado memórias suficientes (batch_size)
+
+    # ========================================================
+    # 8. TREINAMENTO DA REDE
+    # ========================================================
+
+    # Não podemos treinar imediatamente se temos
+    # poucas experiências.
+    #
+    # Precisamos ter pelo menos 64.
     if len(replay_memory) >= batch_size:
 
-        # Pega 64 memórias aleatórias do passado
-        batch = random.sample(replay_memory, batch_size)
+
+        # Escolhe aleatoriamente 64 experiências
+        # da memória.
+        #
+        # Isso é o Experience Replay.
+        batch = random.sample(
+            replay_memory,
+            batch_size
+        )
+
+
+        # Separa as experiências em grupos.
+        #
+        # Antes:
+        #
+        # (estado, ação, recompensa, próximo_estado, done)
+        #
+        # Depois:
+        #
+        # states
+        # actions
+        # rewards
+        # next_states
+        # dones
         states, actions, rewards, next_states, dones = zip(*batch)
 
-        # Converte essas memórias para Tensors (formato da rede neural)
-        b_s = torch.FloatTensor(np.array(states))
-        b_a = torch.LongTensor(actions).unsqueeze(1)
-        b_r = torch.FloatTensor(rewards).unsqueeze(1)
-        b_ns = torch.FloatTensor(np.array(next_states))
-        b_d = torch.FloatTensor(dones).unsqueeze(1) # 1 se o jogo acabou, 0 se não
 
-        # Q-Values atuais: O que a Rede Principal achava que ia ganhar
+        # ----------------------------------------------------
+        # TRANSFORMAR OS DADOS EM TENSORS
+        # ----------------------------------------------------
+
+        # Estados atuais.
+        b_s = torch.FloatTensor(
+            np.array(states)
+        )
+
+
+        # Ações realizadas.
+        #
+        # LongTensor porque ações são índices inteiros.
+        b_a = torch.LongTensor(actions).unsqueeze(1)
+
+
+        # Recompensas recebidas.
+        b_r = torch.FloatTensor(
+            rewards
+        ).unsqueeze(1)
+
+
+        # Próximos estados.
+        b_ns = torch.FloatTensor(
+            np.array(next_states)
+        )
+
+
+        # Indica se o episódio terminou.
+        #
+        # False -> 0
+        # True  -> 1
+        b_d = torch.FloatTensor(
+            dones
+        ).unsqueeze(1)
+
+
+        # ====================================================
+        # 9. Q-VALUE QUE A REDE ATUAL PREVIU
+        # ====================================================
+
+        # A rede principal analisa os estados.
+        #
+        # Ela produz algo como:
+        #
+        # Estado 1 -> [0.7, 0.3]
+        # Estado 2 -> [0.2, 0.8]
+        #
+        # Mas queremos somente o Q-value
+        # da ação que realmente foi realizada.
+        #
+        # gather(1, b_a) pega exatamente esses valores.
         q_values = q_net(b_s).gather(1, b_a)
 
-        # Q-Values Alvo: Equação de Bellman
+
+        # ====================================================
+        # 10. CALCULAR O ALVO
+        # ====================================================
+
+        # Não queremos treinar a Rede Alvo.
+        #
+        # Ela serve apenas para produzir
+        # uma referência estável.
         with torch.no_grad():
-            # Pergunta para a Rede Alvo qual a melhor nota do próximo estado
-            max_next_q = target_net(b_ns).max(1, keepdim=True)[0]
 
-            # Se o jogo acabou (b_d = 1), o alvo é só a recompensa.
-            # Senão, soma a recompensa com o que espera ganhar no futuro.
-            targets = b_r + (1 - b_d) * gamma * max_next_q
+            # A Rede Alvo analisa os próximos estados.
+            #
+            # Exemplo:
+            #
+            # [0.5, 0.9]
+            #
+            # Queremos o maior:
+            #
+            # 0.9
+            #
+            # max(1, keepdim=True)[0]
+            # pega o maior Q-value de cada estado.
+            max_next_q = target_net(
+                b_ns
+            ).max(
+                1,
+                keepdim=True
+            )[0]
 
-        # Calcula o Erro (Diferença entre o que a rede previu e o alvo real)
-        loss = nn.MSELoss()(q_values, targets)
 
-        # Atualiza os pesos da Rede Principal (Backpropagation)
+            # =================================================
+            # EQUAÇÃO DE BELLMAN
+            # =================================================
+            #
+            # alvo =
+            # recompensa
+            # +
+            # gamma * melhor valor futuro
+            #
+            # Porém:
+            #
+            # se o episódio acabou,
+            # não existe futuro.
+            #
+            # Por isso usamos:
+            #
+            # (1 - b_d)
+            #
+            # Se b_d = 1:
+            #
+            # 1 - 1 = 0
+            #
+            # então:
+            #
+            # alvo = recompensa
+            #
+            # Se b_d = 0:
+            #
+            # 1 - 0 = 1
+            #
+            # então:
+            #
+            # alvo =
+            # recompensa +
+            # gamma * futuro
+            targets = (
+                b_r
+                + (1 - b_d)
+                * gamma
+                * max_next_q
+            )
+
+
+        # ====================================================
+        # 11. CALCULAR O ERRO
+        # ====================================================
+
+        # Comparamos:
+        #
+        # O que a rede disse
+        #
+        # contra
+        #
+        # O que ela deveria ter dito.
+        #
+        # Exemplo:
+        #
+        # q_values = 0.4
+        # targets  = 0.8
+        #
+        # Existe um erro de 0.4.
+        loss = nn.MSELoss()(
+            q_values,
+            targets
+        )
+
+
+        # ====================================================
+        # 12. BACKPROPAGATION
+        # ====================================================
+
+        # Primeiro apagamos os gradientes anteriores.
         optimizer.zero_grad()
+
+
+        # Calcula como cada peso da rede
+        # contribuiu para o erro.
         loss.backward()
+
+
+        # Agora o Adam modifica os pesos
+        # tentando diminuir o erro.
         optimizer.step()
 
-    # 7. ATUALIZAÇÃO DA REDE ALVO
-    # A cada 'C' passos, copiamos o conhecimento da Rede Principal para a Rede Alvo
+
+    # ========================================================
+    # 13. ATUALIZAR A REDE ALVO
+    # ========================================================
+
+    # A cada 100 passos:
+    #
+    # copiamos os pesos da rede principal
+    # para a rede alvo.
     if step % C == 0:
-        target_net.load_state_dict(q_net.state_dict())
+
+        target_net.load_state_dict(
+            q_net.state_dict()
+        )
+
+
+# ============================================================
+# 14. FINALIZAR
+# ============================================================
 
 env.close()
+
 print("DQN treinado com sucesso!")
 ```
 
