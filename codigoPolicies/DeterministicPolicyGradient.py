@@ -51,24 +51,28 @@ class PolicyNet(nn.Module):
 class CriticNet(nn.Module):
 
     def __init__(self, state_dim, action_dim):
-
+        # Cria a rede Critic e define quantos valores entram nela.
         super(CriticNet, self).__init__()
 
+        # Cria as camadas que vão receber estado + ação e calcular o valor Q.
         self.fc = nn.Sequential(
-
+            # Junta estado e ação como entrada da rede.
             nn.Linear(state_dim + action_dim, 128),
 
+            # Adiciona uma função de ativação para aprender relações não lineares.
             nn.ReLU(),
 
-            nn.Linear(128, 1)  # Valor Q
-
+            # Calcula o valor Q final para aquele estado e ação.
+            nn.Linear(128, 1)
         )
 
     def forward(self, state, action):
-
+        # Junta o estado e a ação em uma única entrada.
         x = torch.cat([state, action], dim=-1)
 
+        # Passa estado + ação pela rede e retorna o valor Q.
         return self.fc(x)
+
 
 
 # -------------------------------
@@ -178,6 +182,9 @@ def select_action(state):
     state_tensor = torch.FloatTensor(state)
 
     action = policy(state_tensor)
+    
+    # Converte a ação do PyTorch para NumPy, removendo o cálculo de gradiente.
+    # Depois, escala a ação para o limite máximo aceito pelo ambiente.
 
     return action.detach().numpy() * env.action_space.high[0]
 
@@ -206,6 +213,7 @@ for episode in range(200):
 
         action += 0.1 * torch.randn(action_dim).numpy()
 
+       #clip() impede que os valores da ação saiam do limite permitido pelo ambiente.
         action = action.clip(
 
             env.action_space.low,
