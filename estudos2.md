@@ -1,134 +1,127 @@
-    # Resumo de Métodos de Policy Gradient em RL
+# Resumo de Métodos de Policy Gradient em RL
 
-    ## 📖 O que é uma _Policy_
+## 📖 O que é uma _Policy_
 
-    - **[Policy](ca://s?q=O_que_e_policy_em_Reinforcement_Learning)** é uma função que mapeia estados para ações.
-    - Pode ser **determinística** (sempre escolhe a mesma ação para um estado) ou **estocástica** (define uma distribuição de probabilidade sobre ações).
+- **[Policy](ca://s?q=O_que_e_policy_em_Reinforcement_Learning)** é uma função que mapeia estados para ações.
+  - Pode ser **determinística** (sempre escolhe a mesma ação para um estado) ou **estocástica** (define uma distribuição de probabilidade sobre ações).
 
-    ## 🎯 O que é _Policy Gradient_
+  ## 🎯 O que é _Policy Gradient_
+  - **[Policy Gradient](ca://s?q=O_que_e_policy_gradient)** é uma família de algoritmos que ajusta diretamente os parâmetros da _policy_ para maximizar a recompensa esperada.
+  - Em vez de aprender um valor de ação (Q-value), aprende-se a própria política.
 
-    - **[Policy Gradient](ca://s?q=O_que_e_policy_gradient)** é uma família de algoritmos que ajusta diretamente os parâmetros da _policy_ para maximizar a recompensa esperada.
-    - Em vez de aprender um valor de ação (Q-value), aprende-se a própria política.
+  ***
 
-    ---
+  ## 🌐 Stochastic Policy Gradient
+  - Usa políticas **estocásticas** (ex.: softmax sobre ações).
+  - Bom para ambientes com alta incerteza ou quando explorar é crucial.
+  - **Não usar** quando o espaço de ação é contínuo e determinístico (ineficiente).
 
-    ## 🌐 Stochastic Policy Gradient
+  ## ⚡ Deterministic Policy Gradient (DPG)
+  - Usa políticas **determinísticas** (ex.: ação = função direta do estado).
+  - Mais eficiente em espaços contínuos de ação.
+  - **Não usar** em ambientes onde a aleatoriedade é essencial para explorar.
 
-    - Usa políticas **estocásticas** (ex.: softmax sobre ações).
-    - Bom para ambientes com alta incerteza ou quando explorar é crucial.
-    - **Não usar** quando o espaço de ação é contínuo e determinístico (ineficiente).
+  ## 🎭 Actor-Critic Methods
+  - Combina um **actor** (policy) e um **critic** (value function).
+  - Reduz variância do gradiente e melhora estabilidade.
+  - Útil em ambientes complexos e contínuos.
+  - **Não usar** se o ambiente é simples e tabular (overkill).
 
-    ## ⚡ Deterministic Policy Gradient (DPG)
+  ## 🌱 Natural Policy Gradients
+  - Ajusta o gradiente levando em conta a geometria da distribuição de políticas.
+  - Mais estável e eficiente que gradiente padrão.
+  - **Não usar** em problemas pequenos, pois é mais caro computacionalmente.
 
-    - Usa políticas **determinísticas** (ex.: ação = função direta do estado).
-    - Mais eficiente em espaços contínuos de ação.
-    - **Não usar** em ambientes onde a aleatoriedade é essencial para explorar.
+  ## 🔒 Trust Region Optimization (TRPO/PPO)
+  - Impõe restrições para que a atualização da política não seja muito grande.
+  - Evita instabilidade e colapso da política.
+  - **Não usar** em problemas simples onde atualizações grandes não causam problemas.
 
-    ## 🎭 Actor-Critic Methods
+  ## 🔀 Combining Policy Gradient and Q-learning
+  - Usa Q-learning para estimar valores e policy gradient para otimizar a política.
+  - Útil em ambientes com grandes espaços de ação.
+  - **Não usar** se o ambiente é pequeno e tabular (complexidade desnecessária).
 
-    - Combina um **actor** (policy) e um **critic** (value function).
-    - Reduz variância do gradiente e melhora estabilidade.
-    - Útil em ambientes complexos e contínuos.
-    - **Não usar** se o ambiente é simples e tabular (overkill).
+  ***
 
-    ## 🌱 Natural Policy Gradients
+  # Exemplo de Stochastic Policy Gradient com Gym (comentado)
 
-    - Ajusta o gradiente levando em conta a geometria da distribuição de políticas.
-    - Mais estável e eficiente que gradiente padrão.
-    - **Não usar** em problemas pequenos, pois é mais caro computacionalmente.
+  Este código mostra como treinar um agente usando **[Stochastic Policy Gradient](ca://s?q=Exemplo_de_stochastic_policy_gradient)** no ambiente `CartPole-v1` do Gym.
+  Os comentários explicam cada parte para alguém que está começando em **[Reinforcement Learning](ca://s?q=Introducao_a_Reinforcement_Learning)**.
 
-    ## 🔒 Trust Region Optimization (TRPO/PPO)
+  ```python
+  import gym
+  import torch
+  import torch.nn as nn
+  import torch.optim as optim
+  from torch.distributions import Categorical
 
-    - Impõe restrições para que a atualização da política não seja muito grande.
-    - Evita instabilidade e colapso da política.
-    - **Não usar** em problemas simples onde atualizações grandes não causam problemas.
+  # Definimos uma rede neural que será a "policy" (política).
+  # Ela recebe o estado do ambiente e devolve uma distribuição de probabilidade sobre as ações.
+  class PolicyNet(nn.Module):
+      def __init__(self, state_dim, action_dim):
+          super(PolicyNet, self).__init__()
+          self.fc = nn.Sequential(
+              nn.Linear(state_dim, 128),   # Primeira camada totalmente conectada
+              nn.ReLU(),                   # Função de ativação ReLU
+              nn.Linear(128, action_dim),  # Saída com número de ações possíveis
+              nn.Softmax(dim=-1)           # Converte em probabilidades (soma = 1)
+          )
 
-    ## 🔀 Combining Policy Gradient and Q-learning
+      def forward(self, x):
+          return self.fc(x)
 
-    - Usa Q-learning para estimar valores e policy gradient para otimizar a política.
-    - Útil em ambientes com grandes espaços de ação.
-    - **Não usar** se o ambiente é pequeno e tabular (complexidade desnecessária).
+  # Criamos o ambiente CartPole (um carrinho com uma haste que deve ser equilibrada).
+  env = gym.make("CartPole-v1")
 
-    ---
+  # Inicializamos a política com dimensões de entrada (estado) e saída (ações).
+  policy = PolicyNet(env.observation_space.shape[0], env.action_space.n)
 
-    # Exemplo de Stochastic Policy Gradient com Gym (comentado)
+  # Usamos o otimizador Adam para atualizar os pesos da rede neural.
+  optimizer = optim.Adam(policy.parameters(), lr=0.01)
 
-    Este código mostra como treinar um agente usando **[Stochastic Policy Gradient](ca://s?q=Exemplo_de_stochastic_policy_gradient)** no ambiente `CartPole-v1` do Gym.
-    Os comentários explicam cada parte para alguém que está começando em **[Reinforcement Learning](ca://s?q=Introducao_a_Reinforcement_Learning)**.
+  # Loop de treinamento: o agente joga vários episódios.
+  for episode in range(500):
+      state = env.reset()[0]   # Resetamos o ambiente no início de cada episódio
+      rewards, log_probs = [], []
+      done = False
 
-    ```python
-    import gym
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
-    from torch.distributions import Categorical
+      # Loop dentro de um episódio (até o jogo terminar).
+      while not done:
+          state_tensor = torch.FloatTensor(state)   # Converte estado em tensor
+          probs = policy(state_tensor)              # Calcula probabilidades das ações
+          dist = Categorical(probs)                 # Cria distribuição categórica
+          action = dist.sample()                    # Escolhe ação aleatória seguindo a distribuição
 
-    # Definimos uma rede neural que será a "policy" (política).
-    # Ela recebe o estado do ambiente e devolve uma distribuição de probabilidade sobre as ações.
-    class PolicyNet(nn.Module):
-        def __init__(self, state_dim, action_dim):
-            super(PolicyNet, self).__init__()
-            self.fc = nn.Sequential(
-                nn.Linear(state_dim, 128),   # Primeira camada totalmente conectada
-                nn.ReLU(),                   # Função de ativação ReLU
-                nn.Linear(128, action_dim),  # Saída com número de ações possíveis
-                nn.Softmax(dim=-1)           # Converte em probabilidades (soma = 1)
-            )
+          # Executa a ação no ambiente
+          next_state, reward, done, _, _ = env.step(action.item())
 
-        def forward(self, x):
-            return self.fc(x)
+          # Guardamos o log da probabilidade da ação escolhida (para calcular gradiente depois)
+          log_probs.append(dist.log_prob(action))
+          # Guardamos a recompensa recebida
+          rewards.append(reward)
 
-    # Criamos o ambiente CartPole (um carrinho com uma haste que deve ser equilibrada).
-    env = gym.make("CartPole-v1")
+          # Atualizamos o estado
+          state = next_state
 
-    # Inicializamos a política com dimensões de entrada (estado) e saída (ações).
-    policy = PolicyNet(env.observation_space.shape[0], env.action_space.n)
+      # Quando o episódio termina, calculamos a recompensa total
+      total_reward = sum(rewards)
 
-    # Usamos o otimizador Adam para atualizar os pesos da rede neural.
-    optimizer = optim.Adam(policy.parameters(), lr=0.01)
+      # Calculamos a perda (loss) do Policy Gradient:
+      # Queremos maximizar a recompensa, então usamos sinal negativo para o otimizador minimizar.
+      loss = -torch.stack(log_probs).sum() * total_reward
 
-    # Loop de treinamento: o agente joga vários episódios.
-    for episode in range(500):
-        state = env.reset()[0]   # Resetamos o ambiente no início de cada episódio
-        rewards, log_probs = [], []
-        done = False
+      # Atualizamos os parâmetros da rede neural
+      optimizer.zero_grad()
+      loss.backward()
+      optimizer.step()
 
-        # Loop dentro de um episódio (até o jogo terminar).
-        while not done:
-            state_tensor = torch.FloatTensor(state)   # Converte estado em tensor
-            probs = policy(state_tensor)              # Calcula probabilidades das ações
-            dist = Categorical(probs)                 # Cria distribuição categórica
-            action = dist.sample()                    # Escolhe ação aleatória seguindo a distribuição
+      # A cada 50 episódios mostramos a recompensa total
+      if episode % 50 == 0:
+          print(f"Episode {episode}, Reward: {total_reward}")
+  ```
 
-            # Executa a ação no ambiente
-            next_state, reward, done, _, _ = env.step(action.item())
-
-            # Guardamos o log da probabilidade da ação escolhida (para calcular gradiente depois)
-            log_probs.append(dist.log_prob(action))
-            # Guardamos a recompensa recebida
-            rewards.append(reward)
-
-            # Atualizamos o estado
-            state = next_state
-
-        # Quando o episódio termina, calculamos a recompensa total
-        total_reward = sum(rewards)
-
-        # Calculamos a perda (loss) do Policy Gradient:
-        # Queremos maximizar a recompensa, então usamos sinal negativo para o otimizador minimizar.
-        loss = -torch.stack(log_probs).sum() * total_reward
-
-        # Atualizamos os parâmetros da rede neural
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # A cada 50 episódios mostramos a recompensa total
-        if episode % 50 == 0:
-            print(f"Episode {episode}, Reward: {total_reward}")
-    ```
-
-    # Exemplo de Deterministic Policy Gradient (DPG) com Gym
+# Exemplo de Deterministic Policy Gradient (DPG) com Gym
 
     O **[Deterministic Policy Gradient](ca://s?q=Exemplo_de_deterministic_policy_gradient)** é usado em ambientes com **ações contínuas**.
     Diferente do _stochastic policy gradient_, aqui a política não gera uma distribuição de probabilidades, mas sim uma **ação direta** (determinística) para cada estado.

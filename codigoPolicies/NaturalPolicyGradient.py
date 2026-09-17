@@ -21,7 +21,21 @@ class PolicyNet(nn.Module):
             nn.Linear(128, action_dim),
             nn.Softmax(dim=-1)  # Probabilidades das ações
         )
-
+         # Softmax transforma os valores anteriores
+            # em probabilidades.
+            #
+            # As probabilidades ficam entre 0 e 1
+            # e a soma delas será igual a 1.
+            #
+            # Exemplo:
+            # [2.1, 0.5, 1.4]
+            #       ↓
+            # [0.58, 0.12, 0.30]
+            #
+            # Ou seja:
+            # Ação 1 -> 58%
+            # Ação 2 -> 12%
+            # Ação 3 -> 30%
     def forward(self, x):
         return self.fc(x)
 
@@ -36,8 +50,11 @@ class PolicyNet(nn.Module):
 def fisher_information_matrix(log_probs):
 
     # Aproximação simples: matriz diagonal com variâncias
+    #Calcula o exponencial dos logaritmos das probabilidades para obter as probabilidades reais.
     probs = torch.exp(log_probs)
 
+    # cria uma matriz diagonal onde cada elemento da diagonal é dado por probs * (1 - probs).
+    # Isso representa a variância de uma distribuição de Bernoulli para cada ação.
     return torch.diag(probs * (1 - probs))
 
 
@@ -73,6 +90,7 @@ for episode in range(200):
 
         probs = policy(state_tensor)
 
+        #traduz os numeros para probabilidades tipo 0.2 vira 20%
         dist = Categorical(probs)
 
         action = dist.sample()
@@ -89,11 +107,12 @@ for episode in range(200):
 
     # -------------------------------
     # Atualização com Natural Policy Gradient
-    # -------------------------------
+    # -------------------------------65
 
     total_reward = sum(rewards)
 
     # Gradiente padrão
+    #O torch.stack junta uma sequência de tensores criando uma nova dimensão (eixo) para empilhá-los.
     loss = -torch.stack(log_probs).sum() * total_reward
 
     optimizer.zero_grad()
